@@ -39,6 +39,7 @@ playground.xcworkspace
 # Package.pins
 # Package.resolved
 .build/
+AoC2019.xcodeproj
 
 # CocoaPods
 #
