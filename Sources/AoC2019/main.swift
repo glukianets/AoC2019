@@ -2,7 +2,8 @@
 import Foundation
 
 let actions: [String: (String) throws -> String] = [
-    "day3": day3(input:)
+    "day1": day1(input:),
+    "day3": day3(input:),
 ]
 
 func printUsage() -> Never {

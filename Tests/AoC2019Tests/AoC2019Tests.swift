@@ -8,6 +8,16 @@ final class AoC2019Tests: XCTestCase {
         ("testDay3", testDay3),
     ]
 
+    func testDay1() throws {
+        let cases = [
+            "14": (2, 2),
+            "1969": (654, 966),
+            "100756": (33583, 50346)
+        ]
+
+        try self.runTestCases(cases, forDay: 1)
+    }
+
     func testDay3() throws {
         let cases = [
             """
@@ -20,13 +30,7 @@ final class AoC2019Tests: XCTestCase {
             """: (135, 410),
         ]
 
-        for (i, (input, result)) in cases.enumerated() {
-            guard let output = try runBinary(arguments: ["day3"], input: input) else { throw "case \(i) returned empty result" }
-            let numbers = output.components(separatedBy: .whitespaces).compactMap { Int($0) }
-            guard numbers.count == 2 else { throw "case \(i) returned output in invalid format: \(output)" }
-            XCTAssertEqual(result.0, numbers[0])
-            XCTAssertEqual(result.1, numbers[1])
-        }
+        try self.runTestCases(cases, forDay: 3)
     }
 
     private var productsDirectory: URL {
@@ -38,6 +42,16 @@ final class AoC2019Tests: XCTestCase {
       #else
         return Bundle.main.bundleURL
       #endif
+    }
+
+    private func runTestCases(_ cases: [String: (Int, Int)], forDay day: Int) throws {
+        for (i, (input, result)) in cases.enumerated() {
+            guard let output = try runBinary(arguments: ["day\(day)"], input: input), output.count > 0 else { throw "case \(i) returned empty result" }
+            let numbers = output.components(separatedBy: .whitespaces).compactMap { Int($0) }
+            guard numbers.count == 2 else { throw "case \(i) returned output in invalid format: \(output)" }
+            XCTAssertEqual(result.0, numbers[0])
+            XCTAssertEqual(result.1, numbers[1])
+        }
     }
 
     private func runBinary(arguments: [String]? = nil, input: String? = nil) throws -> String? {
