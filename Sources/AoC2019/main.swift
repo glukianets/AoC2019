@@ -4,6 +4,8 @@ import Foundation
 let actions: [String: (String) throws -> String] = [
     "day1": day1(input:),
     "day3": day3(input:),
+    "day2": day2(input:),
+    "debug": day2(input:),
 ]
 
 func printUsage() -> Never {
