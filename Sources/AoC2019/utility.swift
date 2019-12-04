@@ -31,6 +31,28 @@ extension Collection {
         guard self.indices.contains(index) else { throw "Index \(index) is out of bounds" }
         return self[index]
     }
+
+    var intervals: [(first: Self.Element, second: Self.Element)] {
+        guard !self.isEmpty else { return [] }
+        return self.dropFirst().reduce(into: []) { a, e in a.append(a.last.map { ($0.second, e) } ?? (self.first!, e)) }
+    }
+
+    func grouping<T: Equatable>(by trait: (Self.Element) -> T) -> [Self.SubSequence] {
+        var result: [Self.SubSequence] = []
+        var state: (t: T, i: Self.Index)? = nil
+
+        for i in self.indices {
+            let t = trait(self[i])
+            guard let s = state else { state = (t: t, i: i); continue }
+            guard s.t != t else { continue }
+            result.append(self[s.i..<i])
+            state = (t: t, i: i)
+        }
+
+        state.map { result.append(self[$0.i...]) }
+
+        return result
+    }
 }
 
 extension Array {
@@ -51,5 +73,18 @@ extension Array {
     mutating func set(_ value: Self.Element, at index: Self.Index) throws {
         guard self.indices.contains(index) else { throw "Index \(index) is out of bounds" }
         return self[index] = value
+    }
+}
+
+extension BinaryInteger {
+    var digits: [Self] {
+        guard self != 0 else { return [0] }
+        var result: [Self] = []
+        var num = self
+        while num > 0 {
+            result.append(num % 10)
+            num /= 10
+        }
+        return result.reversed()
     }
 }

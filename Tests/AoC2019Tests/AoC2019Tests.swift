@@ -55,6 +55,14 @@ final class AoC2019Tests: XCTestCase {
         try self.runTestCases(cases, forDay: 3)
     }
 
+    func testDay4() throws {
+        let cases = [
+            "138241-674034": (1890, 1277),
+        ]
+
+        try self.runTestCases(cases, forDay: 4)
+    }
+
     private var productsDirectory: URL {
       #if os(macOS)
         for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {

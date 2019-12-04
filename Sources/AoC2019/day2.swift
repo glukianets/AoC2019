@@ -56,6 +56,3 @@ private func solve(intcode: [Int]) throws -> [Int] {
 
     return [result1, result2]
 }
-
-
-// 190643 - too low
