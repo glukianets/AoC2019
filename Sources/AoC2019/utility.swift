@@ -14,8 +14,8 @@ extension FileHandle : TextOutputStream {
 }
 
 extension Optional {
-    func unwrap() throws -> Wrapped {
-        guard let wrapped = self else { throw "Optional unwrap error" }
+    func unwrap(or error: @autoclosure () -> Error = "OptionalUnwrapError") throws -> Wrapped {
+        guard let wrapped = self else { throw error() }
         return wrapped
     }
 }

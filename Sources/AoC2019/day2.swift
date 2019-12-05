@@ -13,34 +13,13 @@ private func formatOutput(_ output: [Int]) throws -> String {
 }
 
 private func solve(intcode: [Int]) throws -> [Int] {
-    func run(_ ll: inout [Int]) throws {
-        guard intcode.count >= 4 else { throw "Invalid input" }
-        var ii = 0
-
-        execution: while true {
-            switch try ll.get(at: ii) {
-            case 1:
-                try ll.set(ll.get(at: ll.get(at: ii + 1)) + ll.get(at: ll.get(at: ii + 2)), at: ll.get(at: ii + 3))
-                ii += 4
-
-            case 2:
-                try ll.set(ll.get(at: ll.get(at: ii + 1)) * ll.get(at: ll.get(at: ii + 2)), at: ll.get(at: ii + 3))
-                ii += 4
-
-            case 99:
-                break execution
-
-            case let opcode:
-                throw "Unknown opcode \(opcode)"
-            }
-        }
-    }
+    let runner = Intcoder(input: { throw "Nothing to input" }, output: { _ in throw "No output expected" })
 
     func run(noun: Int, verb: Int) throws -> Int {
         var input = intcode
         input[1] = noun
         input[2] = verb
-        try run(&input)
+        try runner.run(&input)
         return input[0]
     }
 
