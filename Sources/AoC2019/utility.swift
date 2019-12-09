@@ -76,6 +76,15 @@ extension Array {
         }
     }
 
+    subscript(wrapping index: Self.Index) -> Self.Element {
+        get {
+            self[(index % self.count + self.count) % self.count]
+        }
+        set {
+            self[(index % self.count + self.count) % self.count] = newValue
+        }
+    }
+
     mutating func set(_ value: Self.Element, at index: Self.Index) throws {
         guard self.indices.contains(index) else { throw "Index \(index) is out of bounds" }
         return self[index] = value
@@ -92,5 +101,22 @@ extension BinaryInteger {
             num /= 10
         }
         return result.reversed()
+    }
+}
+
+extension Collection {
+    private func chopped() -> (Self.Element, Self.SubSequence)? {
+        guard let x = self.first else { return nil }
+        return (x, self.dropFirst())
+    }
+
+    private func interleaved(_ element: Self.Element) -> [[Self.Element]] {
+        guard let (head, rest) = self.chopped() else { return [[element]] }
+        return [[element] + self] + rest.interleaved(element).map { [head] + $0 }
+    }
+
+    var permutations: [[Self.Element]] {
+        guard let (head, rest) = self.chopped() else { return [[]] }
+        return rest.permutations.flatMap { $0.interleaved(head) }
     }
 }

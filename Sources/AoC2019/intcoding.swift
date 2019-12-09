@@ -1,6 +1,12 @@
 import Foundation
 
 struct Intcoder {
+    enum State: Equatable {
+        case running(at: Int)
+        case paused(at: Int)
+        case halted
+    }
+
     struct Command {
         fileprivate let function: Any
         fileprivate let scheme: (arity: Int, returns: Bool)
@@ -23,6 +29,7 @@ struct Intcoder {
     enum ExecutionControl: Error {
         case jump(Int)
         case halt
+        case pause
     }
 
     let commands: [Int: Command]
@@ -45,9 +52,18 @@ struct Intcoder {
         ])
     }
 
-    func run(_ ll: inout [Int]) throws {
-        var ii = 0
-        var halt = false
+    @discardableResult func run(_ ll: inout [Int], state initialState: State? = nil) throws -> State {
+        var state: State
+        switch initialState {
+        case let .running(at: ll)?:
+            state = .running(at: ll)
+        case let .paused(ii)?:
+            state = .running(at: ii)
+        case .halted?:
+            throw "Cannot continue from halted state"
+        case nil:
+            state = .running(at: 0)
+        }
 
         func get(_ i: Int, mode: ArgMode) throws -> Int {
             switch mode {
@@ -63,7 +79,7 @@ struct Intcoder {
             }
         }
 
-        while !halt {
+        while case var .running(ii) = state {
             let opcode = try get(ii, mode: .immediate)
             ii += 1
             var argmodes = try (opcode / 100).digits.map { try ArgMode(rawValue: $0).unwrap(or: "Unrecognized arg mode: \($0) in \(opcode)") }
@@ -85,16 +101,20 @@ struct Intcoder {
                 case (3, true): try ret((command.function as! (Int, Int, Int) throws -> Int)(arg(), arg(), arg()))
                 default: throw "Unsupported op scheme: \(command.scheme)"
                 }
+                state = .running(at: ii)
             } catch ExecutionControl.jump(let address) {
-                print("jmp ", address)
-                ii = address
+                state = .running(at: address)
             } catch ExecutionControl.halt {
-                halt = true
+                state = .halted
+            } catch ExecutionControl.pause {
+                guard case let .running(at: ii) = state else { throw "Cannot pause while not running (halted)" }
+                return .paused(at: ii)
             } catch {
                 throw error
             }
         }
-        print("HALT")
+
+        return state
     }
 }
 
