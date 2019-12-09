@@ -53,6 +53,12 @@ extension Collection {
 
         return result
     }
+
+    func grouping(by count: Int) -> [Self.SubSequence] {
+        guard count > 0 else { return [] }
+        guard count < self.count else { return [self[self.startIndex..<self.endIndex]] }
+        return (0 ... (self.count - 1) / count).map { self.dropLast($0 * count).suffix(count) }.reversed()
+    }
 }
 
 extension Array {
