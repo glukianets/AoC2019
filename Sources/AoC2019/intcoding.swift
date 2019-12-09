@@ -2,8 +2,8 @@ import Foundation
 
 struct Intcoder {
     enum State: Equatable {
-        case running(at: Int)
-        case paused(at: Int)
+        case running(at: Int, rb: Int)
+        case paused(at: Int, rb: Int)
         case halted
     }
 
@@ -28,6 +28,7 @@ struct Intcoder {
 
     enum ExecutionControl: Error {
         case jump(Int)
+        case adjustRelBase(Int)
         case halt
         case pause
     }
@@ -48,6 +49,7 @@ struct Intcoder {
             6: Command { (cond, addr) -> Void in if cond == 0 { throw ExecutionControl.jump(addr) } },
             7: Command { $0 < $1 ? 1 : 0 },
             8: Command { $0 == $1 ? 1 : 0 },
+            9: Command { (i) -> Void in throw ExecutionControl.adjustRelBase(i) },
             99: Command { () -> Void in throw ExecutionControl.halt },
         ])
     }
@@ -55,39 +57,47 @@ struct Intcoder {
     @discardableResult func run(_ ll: inout [Int], state initialState: State? = nil) throws -> State {
         var state: State
         switch initialState {
-        case let .running(at: ll)?:
-            state = .running(at: ll)
-        case let .paused(ii)?:
-            state = .running(at: ii)
+        case let .running(ll, rb)?:
+            state = .running(at: ll, rb: rb)
+        case let .paused(ii, rb)?:
+            state = .running(at: ii, rb: rb)
         case .halted?:
             throw "Cannot continue from halted state"
         case nil:
-            state = .running(at: 0)
+            state = .running(at: 0, rb: 0)
         }
 
-        func get(_ i: Int, mode: ArgMode) throws -> Int {
+        func get(_ index: Int, rb: Int, mode: ArgMode) throws -> Int {
             switch mode {
-            case .immediate: return try ll.get(at: i)
-            case .position: return try ll.get(at: ll.get(at: i))
+            case .position: return try get(get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
+            case .relative: return try get(rb + get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
+            case .immediate:
+                guard index < ll.count else { return 0 }
+                return try ll.get(at: index)
             }
         }
 
-        func set(_ value: Int, at index: Int, mode: ArgMode) throws {
+        func set(_ value: Int, at index: Int, rb: Int, mode: ArgMode) throws {
             switch mode {
-            case .immediate: try ll.set(value, at: index)
-            case .position: try ll.set(value, at: ll.get(at: index))
+            case .position: try set(value, at: get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
+            case .relative: try set(value, at: rb + get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
+            case .immediate:
+                if index >= ll.count {
+                    ll += Array(repeating: 0, count: index - ll.count + 1)
+                }
+                try ll.set(value, at: index)
             }
         }
 
-        while case var .running(ii) = state {
-            let opcode = try get(ii, mode: .immediate)
+        while case var .running(ii, rb) = state {
+            let opcode = try get(ii, rb: rb, mode: .immediate)
             ii += 1
             var argmodes = try (opcode / 100).digits.map { try ArgMode(rawValue: $0).unwrap(or: "Unrecognized arg mode: \($0) in \(opcode)") }
             let code = opcode % 100
             let command = try commands[code].unwrap(or: "Unrecognized command code: \(code) in \(opcode)")
 
-            func arg() throws -> Int { defer { ii += 1 }; return try get(ii, mode: argmodes.popLast() ?? .position) }
-            func ret(_ value: Int) throws { try set(value, at: ii, mode: .position); ii += 1 }
+            func arg() throws -> Int { defer { ii += 1 }; return try get(ii, rb: rb, mode: argmodes.popLast() ?? .position) }
+            func ret(_ value: Int) throws { try set(value, at: ii, rb: rb, mode: .position); ii += 1 }
 
             do {
                 switch command.scheme {
@@ -101,14 +111,18 @@ struct Intcoder {
                 case (3, true): try ret((command.function as! (Int, Int, Int) throws -> Int)(arg(), arg(), arg()))
                 default: throw "Unsupported op scheme: \(command.scheme)"
                 }
-                state = .running(at: ii)
+                state = .running(at: ii, rb: rb)
             } catch ExecutionControl.jump(let address) {
-                state = .running(at: address)
+                guard case let .running(_, rb) = state else { throw "Cannot jump while not running (halted)" }
+                state = .running(at: address, rb: rb)
+            } catch ExecutionControl.adjustRelBase(let offset) {
+                guard case let .running(ii, rb) = state else { throw "Cannot relrebase while not running (halted)" }
+                state = .running(at: ii, rb: rb + offset)
             } catch ExecutionControl.halt {
                 state = .halted
             } catch ExecutionControl.pause {
-                guard case let .running(at: ii) = state else { throw "Cannot pause while not running (halted)" }
-                return .paused(at: ii)
+                guard case let .running(ii, rb) = state else { throw "Cannot pause while not running (halted)" }
+                return .paused(at: ii, rb: rb)
             } catch {
                 throw error
             }
@@ -119,6 +133,7 @@ struct Intcoder {
 }
 
 private enum ArgMode: Int, RawRepresentable {
+    case relative = 2
     case immediate = 1
     case position = 0
 }
