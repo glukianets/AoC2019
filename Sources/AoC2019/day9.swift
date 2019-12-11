@@ -13,16 +13,19 @@ private func formatOutput(_ output: (Int, Int)) throws -> String {
 }
 
 private func solve(input program: [Int]) throws -> (Int, Int) {
-    let result1 = try { () -> Int in
-        var output = 0
-        let coder = Intcoder(input: {
-            print("in")
-            return 1
-        }, output: { output = $0 })
+    func run(input: Int) throws -> [Int] {
+        var output: [Int] = []
+        let coder = Intcoder(input: { input }, output: { output.append($0) })
         var memory = program
         try coder.run(&memory)
         return output
-    }()
+    }
 
-    return (result1, 0)
+    let result1 = try run(input: 1)
+    guard let r1 = result1.first, result1.count == 1 else { throw "Invalid output for pt.1: \(result1)" }
+
+    let result2 = try run(input: 2)
+    guard let r2 = result2.first, result2.count == 1 else { throw "Invalid output for pt.1: \(result2)" }
+
+    return (r1, r2)
 }

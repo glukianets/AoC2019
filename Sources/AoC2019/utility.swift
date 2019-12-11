@@ -120,3 +120,12 @@ extension Collection {
         return rest.permutations.flatMap { $0.interleaved(head) }
     }
 }
+
+infix operator /=%: MultiplicationPrecedence
+
+func /=%<T: BinaryInteger>(_ lhs: inout T, _ rhs: T) -> T {
+    let result = lhs % rhs
+    lhs /= rhs
+    return result
+}
+

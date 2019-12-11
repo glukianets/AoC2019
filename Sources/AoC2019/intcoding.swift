@@ -8,29 +8,21 @@ struct Intcoder {
     }
 
     struct Command {
-        fileprivate let function: Any
-        fileprivate let scheme: (arity: Int, returns: Bool)
+        typealias Function = (() throws -> Int, (Int) throws -> Void) throws -> ExecutionControl
 
-        init(_ f: @escaping () throws -> Void) { self.init(f, (0, false)) }
-        init(_ f: @escaping (Int) throws -> Void) { self.init(f, (1, false)) }
-        init(_ f: @escaping (Int, Int) throws -> Void) { self.init(f, (2, false)) }
-        init(_ f: @escaping (Int, Int, Int) throws -> Void) { self.init(f, (3, false)) }
-        init(_ f: @escaping () throws -> Int) { self.init(f, (0, true)) }
-        init(_ f: @escaping (Int) throws -> Int) { self.init(f, (1, true)) }
-        init(_ f: @escaping (Int, Int) throws -> Int) { self.init(f, (2, true)) }
-        init(_ f: @escaping (Int, Int, Int) throws -> Int) { self.init(f, (3, true)) }
+        fileprivate let function: Function
 
-        private init(_ f: Any, _ scheme: (Int, Bool)) {
-            self.scheme = scheme
-            self.function = f
+        init(_ function: @escaping Function) {
+            self.function = function
         }
     }
 
     enum ExecutionControl: Error {
-        case jump(Int)
-        case adjustRelBase(Int)
+        case jump(ii: Int?, rb: Int?)
         case halt
         case pause
+        case rollback
+        case `continue`
     }
 
     let commands: [Int: Command]
@@ -41,33 +33,31 @@ struct Intcoder {
 
     init(input: @escaping () throws -> Int, output: @escaping (Int) throws -> Void) {
         self.init(commands: [
-            1: Command(+),
-            2: Command(*),
-            3: Command(input),
-            4: Command(output),
-            5: Command { (cond, addr) -> Void in if cond != 0 { throw ExecutionControl.jump(addr) } },
-            6: Command { (cond, addr) -> Void in if cond == 0 { throw ExecutionControl.jump(addr) } },
-            7: Command { $0 < $1 ? 1 : 0 },
-            8: Command { $0 == $1 ? 1 : 0 },
-            9: Command { (i) -> Void in throw ExecutionControl.adjustRelBase(i) },
-            99: Command { () -> Void in throw ExecutionControl.halt },
+            1: Command { take, put in try put(take() + take()); return .continue }, // +
+            2: Command { take, put in try put(take() * take()); return .continue }, // *
+            3: Command { _, put in try put(input()); return .continue }, // input
+            4: Command { take, _ in try output(take()); return .continue }, // output
+            5: Command { take, put in let cond = try take(); let addr = try take(); return cond == 0 ? .continue : .jump(ii: addr, rb: nil) }, // jmp
+            6: Command { take, put in let cond = try take(); let addr = try take(); return cond == 0 ? .jump(ii: addr, rb: nil) : .continue }, // njump
+            7: Command { take, put in try put(try take() < (try take()) ? 1 : 0); return .continue }, // <
+            8: Command { take, put in try put(try take() == (try take()) ? 1 : 0); return .continue }, // =
+            9: Command { take, _ in ExecutionControl.jump(ii: nil, rb: try take()) }, // adj rb
+            99: Command { _, _ in ExecutionControl.halt }, // halt
         ])
     }
 
     @discardableResult func run(_ ll: inout [Int], state initialState: State? = nil) throws -> State {
-        var state: State
-        switch initialState {
-        case let .running(ll, rb)?:
-            state = .running(at: ll, rb: rb)
-        case let .paused(ii, rb)?:
-            state = .running(at: ii, rb: rb)
-        case .halted?:
-            throw "Cannot continue from halted state"
-        case nil:
-            state = .running(at: 0, rb: 0)
-        }
+        var trace: [Int] = []
+        var state: State = try {
+            switch initialState {
+            case let .running(ll, rb)?: return .running(at: ll, rb: rb)
+            case let .paused(ii, rb)?: return .running(at: ii, rb: rb)
+            case .halted?: throw "Cannot continue from halted state"
+            case nil: return .running(at: 0, rb: 0)
+            }
+        }()
 
-        func get(_ index: Int, rb: Int, mode: ArgMode) throws -> Int {
+        func get(_ index: Int, rb: Int, mode: ParameterMode) throws -> Int {
             switch mode {
             case .position: return try get(get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
             case .relative: return try get(rb + get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
@@ -77,54 +67,38 @@ struct Intcoder {
             }
         }
 
-        func set(_ value: Int, at index: Int, rb: Int, mode: ArgMode) throws {
+        func set(_ value: Int, at index: Int, rb: Int, mode: ParameterMode) throws {
             switch mode {
-            case .position: try set(value, at: get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
-            case .relative: try set(value, at: rb + get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
+            case .position: return try set(value, at: get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
+            case .relative: return try set(value, at: rb + get(index, rb: rb, mode: .immediate), rb: rb, mode: .immediate)
             case .immediate:
-                if index >= ll.count {
-                    ll += Array(repeating: 0, count: index - ll.count + 1)
-                }
-                try ll.set(value, at: index)
+                if index >= ll.count { ll += Array(repeating: 0, count: index - ll.count + 1) }
+                return try ll.set(value, at: index)
             }
         }
 
         while case var .running(ii, rb) = state {
-            let opcode = try get(ii, rb: rb, mode: .immediate)
+            trace.append(ii)
+            var opcode = try get(ii, rb: rb, mode: .immediate)
             ii += 1
-            var argmodes = try (opcode / 100).digits.map { try ArgMode(rawValue: $0).unwrap(or: "Unrecognized arg mode: \($0) in \(opcode)") }
-            let code = opcode % 100
-            let command = try commands[code].unwrap(or: "Unrecognized command code: \(code) in \(opcode)")
+            let command = try commands[opcode /=% 100].unwrap(or: "Unrecognized command code in \(opcode)")
 
-            func arg() throws -> Int { defer { ii += 1 }; return try get(ii, rb: rb, mode: argmodes.popLast() ?? .position) }
-            func ret(_ value: Int) throws { try set(value, at: ii, rb: rb, mode: .position); ii += 1 }
+            func nextMode() throws -> ParameterMode { try ParameterMode(rawValue: opcode /=% 10).unwrap(or: "Unrecognized parameter mode in \(opcode)") }
+            func takeNext() throws -> Int { defer { ii += 1 }; return try get(ii, rb: rb, mode: nextMode()) }
+            func putNext(_ value: Int) throws { defer { ii += 1 }; return try set(value, at: ii, rb: rb, mode: nextMode()) }
 
-            do {
-                switch command.scheme {
-                case (0, false): try (command.function as! () throws -> Void)()
-                case (1, false): try (command.function as! (Int) throws -> Void)(arg())
-                case (2, false): try (command.function as! (Int, Int) throws -> Void)(arg(), arg())
-                case (3, false): try (command.function as! (Int, Int, Int) throws -> Void)(arg(), arg(), arg())
-                case (0, true): try ret((command.function as! () throws -> Int)())
-                case (1, true): try ret((command.function as! (Int) throws -> Int)(arg()))
-                case (2, true): try ret((command.function as! (Int, Int) throws -> Int)(arg(), arg()))
-                case (3, true): try ret((command.function as! (Int, Int, Int) throws -> Int)(arg(), arg(), arg()))
-                default: throw "Unsupported op scheme: \(command.scheme)"
-                }
-                state = .running(at: ii, rb: rb)
-            } catch ExecutionControl.jump(let address) {
-                guard case let .running(_, rb) = state else { throw "Cannot jump while not running (halted)" }
-                state = .running(at: address, rb: rb)
-            } catch ExecutionControl.adjustRelBase(let offset) {
-                guard case let .running(ii, rb) = state else { throw "Cannot relrebase while not running (halted)" }
-                state = .running(at: ii, rb: rb + offset)
-            } catch ExecutionControl.halt {
+            switch try command.function(takeNext, putNext) {
+            case let .jump(_ii, _rb):
+                state = .running(at: _ii ?? ii, rb: rb + (_rb ?? 0))
+            case .halt:
                 state = .halted
-            } catch ExecutionControl.pause {
+            case .pause:
                 guard case let .running(ii, rb) = state else { throw "Cannot pause while not running (halted)" }
                 return .paused(at: ii, rb: rb)
-            } catch {
-                throw error
+            case .rollback:
+                break;
+            case .continue:
+                state = .running(at: ii, rb: rb)
             }
         }
 
@@ -132,7 +106,7 @@ struct Intcoder {
     }
 }
 
-private enum ArgMode: Int, RawRepresentable {
+private enum ParameterMode: Int, RawRepresentable {
     case relative = 2
     case immediate = 1
     case position = 0
