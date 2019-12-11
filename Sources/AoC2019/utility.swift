@@ -37,6 +37,10 @@ extension Collection {
         return self.dropFirst().reduce(into: []) { a, e in a.append(a.last.map { ($0.second, e) } ?? (self.first!, e)) }
     }
 
+    var nonEmptyOrNil: Self? {
+        return self.isEmpty ? nil : self
+    }
+
     func grouping<T: Equatable>(by trait: (Self.Element) -> T) -> [Self.SubSequence] {
         var result: [Self.SubSequence] = []
         var state: (t: T, i: Self.Index)? = nil
@@ -59,6 +63,10 @@ extension Collection {
         guard count < self.count else { return [self[self.startIndex..<self.endIndex]] }
         return (0 ... (self.count - 1) / count).map { self.dropLast($0 * count).suffix(count) }.reversed()
     }
+}
+
+extension Collection where Element: Hashable {
+    func intoSet() -> Set<Element> { .init(self) }
 }
 
 extension Array {
@@ -129,3 +137,40 @@ func /=%<T: BinaryInteger>(_ lhs: inout T, _ rhs: T) -> T {
     return result
 }
 
+func gcd<T: BinaryInteger>(_ lhs: T, _ rhs: T) -> T {
+    guard lhs != 0 else { return rhs }
+    guard rhs != 0 else { return lhs }
+    let mod: T = lhs % rhs
+    return mod != 0 ? gcd(rhs, mod) : rhs
+}
+
+struct ProducingIterator<State, Element>: IteratorProtocol {
+    typealias Function = (inout State) -> Element?
+
+    private var state: State
+    private let function: Function
+
+    init(_ state: State, producer function: @escaping Function) {
+        self.state = state
+        self.function = function
+    }
+
+    public mutating func next() -> Element? {
+        self.function(&self.state)
+    }
+}
+
+struct Produce<State, Element>: Sequence {
+    typealias Function = (inout State) -> Element?
+    private let state: State
+    private let function: Function
+
+    init(_ state: State, producer function: @escaping Function) {
+        self.state = state
+        self.function = function
+    }
+
+    func makeIterator() -> ProducingIterator<State, Element> {
+        ProducingIterator(self.state, producer: self.function)
+    }
+}
