@@ -72,6 +72,31 @@ final class AoC2019Tests: XCTestCase {
 
         try self.runTestCases(cases, forDay: 7)
     }
+    
+    func testDay12() throws {
+        let cases = [
+            """
+            <x=16, y=-8, z=13>
+            <x=4, y=10, z=10>
+            <x=17, y=-5, z=6>
+            <x=13, y=-3, z=0>
+            """: (7687, 334945516288044),
+            """
+            <x=-1, y=0, z=2>
+            <x=2, y=-10, z=-7>
+            <x=4, y=-8, z=8>
+            <x=3, y=5, z=-1>
+            """: (183, 2772),
+            """
+            <x=-8, y=-10, z=0>
+            <x=5, y=5, z=10>
+            <x=2, y=-7, z=3>
+            <x=9, y=-8, z=-3>
+            """: (14645, 4686774924),
+        ]
+
+        try self.runTestCases(cases, forDay: 12)
+    }
 
     private var productsDirectory: URL {
       #if os(macOS)

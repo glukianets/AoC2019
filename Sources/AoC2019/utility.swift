@@ -144,6 +144,11 @@ func gcd<T: BinaryInteger>(_ lhs: T, _ rhs: T) -> T {
     return mod != 0 ? gcd(rhs, mod) : rhs
 }
 
+func lcm<T: BinaryInteger>(_ lhs: T, _ rhs: T) -> T {
+    guard lhs != 0 && rhs != 0 else { return 0 }
+    return lhs / gcd(lhs, rhs) * rhs
+}
+
 struct ProducingIterator<State, Element>: IteratorProtocol {
     typealias Function = (inout State) -> Element?
 

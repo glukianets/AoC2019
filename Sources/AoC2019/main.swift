@@ -13,7 +13,8 @@ let actions: [String: (String) throws -> String] = [
     "day9": day9(input:),
     "day10": day10(input:),
     "day11": day11(input:),
-    "debug": day11(input:),
+    "day12": day12(input:),
+    "debug": day12(input:),
 ]
 
 func printUsage() -> Never {
