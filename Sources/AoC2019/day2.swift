@@ -9,7 +9,7 @@ private func parseInput(_ input: String) throws -> [Int] {
 }
 
 private func formatOutput(_ output: [Int]) throws -> String {
-    return output.map { $0.description }.joined(separator: " ")
+    return output.map { $0.description }.joined(separator: "\n")
 }
 
 private func solve(intcode: [Int]) throws -> [Int] {

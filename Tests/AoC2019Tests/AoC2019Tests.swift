@@ -112,7 +112,7 @@ final class AoC2019Tests: XCTestCase {
     private func runTestCases(_ cases: [String: (Int, Int)], forDay day: Int) throws {
         for (i, (input, result)) in cases.enumerated() {
             guard let output = try runBinary(arguments: ["day\(day)"], input: input), output.count > 0 else { throw "case \(i) returned empty result" }
-            let numbers = output.components(separatedBy: .whitespaces).compactMap { Int($0) }
+            let numbers = output.components(separatedBy: .newlines).compactMap { Int($0) }
             guard numbers.count == 2 else { throw "case \(i) returned output in invalid format: \(output)" }
             XCTAssertEqual(result.0, numbers[0])
             XCTAssertEqual(result.1, numbers[1])

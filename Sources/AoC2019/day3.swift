@@ -62,7 +62,7 @@ private func parseInput(_ input: String) throws -> [[Interval]] {
 }
 
 private func formatOutput(_ output: (Int, Int)) throws -> String {
-    return "\(output.0) \(output.1)"
+    return "\(output.0)\n\(output.1)\n"
 }
 
 private func solve(lines: [[Interval]]) throws -> (Int, Int) {

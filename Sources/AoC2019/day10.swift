@@ -27,7 +27,7 @@ private func parseInput(_ input: String) throws -> Set<Point> {
 }
 
 private func formatOutput(_ output: (Int, Int)) throws -> String {
-    return "\(output.0) \(output.1)\n"
+    return "\(output.0)\n\(output.1)\n"
 }
 
 private func solve(input points: Set<Point>) throws -> (Int, Int) {

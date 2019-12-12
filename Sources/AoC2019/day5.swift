@@ -9,7 +9,7 @@ private func parseInput(_ input: String) throws -> [Int] {
 }
 
 private func formatOutput(_ output: (Int, Int)) throws -> String {
-    return "\(output.0) \(output.1)"
+    return "\(output.0)\n\(output.1)\n"
 }
 
 private func solve(intcode: [Int]) throws -> (Int, Int) {
